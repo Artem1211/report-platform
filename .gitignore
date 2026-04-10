@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Prisma compiled output (Prisma 7 compiles ts files in-place)
+backend/prisma.config.js
+backend/prisma.config.js.map
+backend/prisma.config.d.ts
+backend/prisma/*.js
+backend/prisma/*.js.map
+backend/prisma/*.d.ts
+
+# Generated files
+uploads/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+.claude/
+.serena/

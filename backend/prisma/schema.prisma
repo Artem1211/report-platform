@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ReportTemplate {
+  id           String      @id @default(uuid())
+  type         String      @unique
+  name         String
+  description  String
+  paramsSchema Json
+  sourceConfig Json
+  runs         ReportRun[]
+  createdAt    DateTime    @default(now())
+}
+
+model ReportRun {
+  id          String     @id @default(uuid())
+  templateId  String
+  template    ReportTemplate @relation(fields: [templateId], references: [id])
+  params      Json
+  status      String     @default("pending")
+  resultPath  String?
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+}
+
+model MedicalCertificate {
+  id             String   @id @default(uuid())
+  issuedAt       DateTime
+  enterprise     String
+  doctorName     String
+  specialization String
+  workerName     String
+  validUntil     DateTime
+  status         String
+}

@@ -1,0 +1,26 @@
+@use '@/shared/styles/mixins.scss' as mixins;
+
+.wrapper {
+  background-color: var(--color-bg);
+}
+
+.header {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+
+  @include mixins.minDesktop {
+    padding: 24px 32px 16px;
+  }
+}
+
+.content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+
+  @include mixins.minDesktop {
+    padding: 24px 32px;
+  }
+}

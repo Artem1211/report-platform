@@ -1,0 +1,67 @@
+@use '@/shared/styles/mixins.scss' as mixins;
+
+.row {
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.2s ease;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: var(--color-bg);
+  }
+}
+
+.actionsMobile {
+  padding: 12px 16px;
+  vertical-align: middle;
+
+  @include mixins.minDesktop {
+    display: none;
+  }
+}
+
+.actionsDesktop {
+  padding: 12px 16px;
+  vertical-align: middle;
+  display: none;
+
+  @include mixins.minDesktop {
+    display: table-cell;
+  }
+}
+
+.cell {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+.dateCell {
+  padding: 12px 16px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.downloadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background-color: var(--color-accent);
+  color: #fff;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+.errorIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-error);
+  cursor: help;
+}
