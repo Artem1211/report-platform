@@ -1,5 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { DatabaseModule } from './database';
@@ -9,6 +11,7 @@ import { RunsModule } from './runs';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 60 }] }),
     DatabaseModule,
     DatasourceModule,
     BullModule.forRootAsync({
@@ -20,6 +23,7 @@ import { RunsModule } from './runs';
     ReportsModule,
     RunsModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

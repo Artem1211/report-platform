@@ -1,5 +1,7 @@
 # Report Platform
 
+![CI](https://github.com/artemnechipurenko/report-platform/actions/workflows/ci.yml/badge.svg)
+
 Async report generation platform. Create templates via UI, run them on demand, download results as XLSX.
 
 ## Quick Start
