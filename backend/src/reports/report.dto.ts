@@ -1,4 +1,5 @@
 import { ApiProperty, getSchemaPath } from '@nestjs/swagger';
+import { IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import type { SourceConfig } from '../runs/run.types';
 
@@ -44,12 +45,18 @@ export class ReportTemplateDto {
 
 export class CreateTemplateDto {
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   name!: string;
 
   @ApiProperty({ required: false, nullable: true })
+  @IsString()
+  @IsOptional()
   description?: string;
 
   @ApiProperty({ type: 'object', additionalProperties: true })
+  @IsObject()
   sourceConfig!: SourceConfig;
 }
 

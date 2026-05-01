@@ -3,7 +3,7 @@ import { Job } from 'bullmq';
 import { unlink } from 'fs/promises';
 
 import { PrismaService } from '../database';
-import { DynamicProcessor } from './dynamic.processor';
+import { DynamicProcessor } from './dynamic-processor';
 import { XlsxRenderer } from './xlsx.renderer';
 
 export const RUNS_QUEUE = 'runs';

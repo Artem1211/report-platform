@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
-import { DynamicProcessor } from './dynamic.processor';
+import { DynamicProcessor } from './dynamic-processor';
 import { RUNS_QUEUE, RunWorker } from './run.worker';
 import { RunsController } from './runs.controller';
 import { RunsService } from './runs.service';

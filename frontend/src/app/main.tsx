@@ -4,12 +4,15 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './app';
+import { ErrorBoundary } from './error-boundary';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

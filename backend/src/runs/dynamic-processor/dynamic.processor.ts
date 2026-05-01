@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Workbook } from 'exceljs';
 import { createReadStream } from 'fs';
 
-import { DatasourceService } from '../datasource';
-import type { ReportData, SourceConfig } from './run.types';
+import { DatasourceService } from '../../datasource';
+import type { ReportData, SourceConfig } from '../run.types';
 
 const FORBIDDEN_SQL = /\b(DROP|CREATE|ALTER|DELETE|INSERT|UPDATE|TRUNCATE)\b/i;
 const CLAUSE_BEFORE_FILTER = /\b(GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|OFFSET)\b/i;

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsObject } from 'class-validator';
 
 export class ReportRunDto {
   @ApiProperty()
@@ -28,5 +29,6 @@ export class ReportRunDto {
 
 export class RunReportDto {
   @ApiProperty({ description: 'Report run parameters (dateFrom, dateTo, etc.)' })
+  @IsObject()
   params!: Record<string, unknown>;
 }

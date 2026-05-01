@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { DatabaseModule } from './database';
 import { DatasourceModule } from './datasource';
 import { ReportsModule } from './reports';
@@ -20,4 +21,8 @@ import { RunsModule } from './runs';
     RunsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(LoggerMiddleware).forRoutes('*path');
+  }
+}
