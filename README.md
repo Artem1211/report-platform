@@ -1,48 +1,48 @@
 # Report Platform
 
-Платформа асинхронной генерации отчётов. Создавай шаблоны через UI, запускай по требованию, скачивай результаты в XLSX.
+Async report generation platform. Create templates via UI, run them on demand, download results as XLSX.
 
-## Быстрый старт
+## Quick Start
 
 ```bash
 docker-compose up --build
 ```
 
-| Сервис | URL |
-|--------|-----|
-| Фронтенд | http://localhost |
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost |
 | Backend API | http://localhost:3000/api |
 | Swagger | http://localhost:3000/api/docs |
 
-## Стек
+## Stack
 
-| Слой | Технология |
-|------|-----------|
+| Layer | Technology |
+|-------|-----------|
 | Backend | NestJS + TypeScript |
 | Frontend | React 19 + Vite + FSD |
-| Очередь | Redis + BullMQ |
-| Основная БД | PostgreSQL + Prisma 7 |
-| Аналитическая БД | ClickHouse |
-| Инфраструктура | Docker Compose + nginx |
+| Queue | Redis + BullMQ |
+| Primary DB | PostgreSQL + Prisma 7 |
+| Analytics DB | ClickHouse |
+| Infrastructure | Docker Compose + nginx |
 
-## Возможности
+## Features
 
-- **Динамические шаблоны** — создание SQL / API / File шаблонов через UI
-- **Асинхронное выполнение** — задачи ставятся в очередь BullMQ, обрабатываются в фоне
-- **Статус в реальном времени** — поллинг через `refetchInterval`, останавливается автоматически
-- **Скачивание XLSX** — готовые отчёты доступны сразу после завершения
+- **Dynamic templates** — create SQL / API / File templates via UI
+- **Async execution** — jobs are queued with BullMQ and processed in the background
+- **Live status** — polling via `refetchInterval`, stops automatically when done
+- **XLSX download** — generated reports are available immediately after completion
 
-## Архитектура
+## Architecture
 
-См. [ARCHITECTURE.md](./ARCHITECTURE.md)
+See [ARCHITECTURE.md](./ARCHITECTURE.md)
 
-## Локальная разработка
+## Local Development
 
 ```bash
-# Инфраструктура (postgres, redis, clickhouse)
+# Infrastructure (postgres, redis, clickhouse)
 docker-compose up postgres redis clickhouse
 
-# Backend — требует переменную DATASOURCES
+# Backend — requires DATASOURCES env variable
 cd backend
 pnpm install
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/report_platform \
@@ -50,17 +50,17 @@ REDIS_URL=redis://127.0.0.1:6379 \
 DATASOURCES='[{"id":"clickhouse","label":"ClickHouse","engine":"clickhouse","url":"http://localhost:8123","defaultQuery":"SELECT * FROM exam_events LIMIT 1000","dateField":"exam_date"},{"id":"postgres","label":"PostgreSQL","engine":"postgres","url":"postgresql://postgres:postgres@localhost:5432/report_platform","defaultQuery":"SELECT * FROM \"MedicalCertificate\" LIMIT 1000","dateField":"issuedAt"}]' \
 pnpm start:dev
 
-# Frontend (отдельный терминал)
+# Frontend (separate terminal)
 cd frontend
 pnpm install
 pnpm dev
 ```
 
-Фронтенд: http://localhost:5173  
+Frontend: http://localhost:5173  
 Backend: http://localhost:3000/api  
 Swagger: http://localhost:3000/api/docs
 
-> После изменения DTO на бэке — перегенерировать типы фронта:
+> After changing backend DTOs, regenerate frontend types:
 > ```bash
 > cd frontend && pnpm generate:api
 > ```

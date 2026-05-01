@@ -1,20 +1,20 @@
-# Архитектура Report Platform
+# Report Platform Architecture
 
-## 1. Компоненты, потоки данных, границы ответственности
+## 1. Components, data flows, and responsibility boundaries
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                          Frontend (React)                        │
 │                                                                  │
-│   /reports — управление шаблонами     /runs — история запусков   │
-│   • создать шаблон (SQL/API/File)     • список всех запусков     │
-│   • запустить отчёт                  • live-статус (поллинг)     │
-│   • удалить шаблон                   • скачать XLSX              │
+│   /reports — template management         /runs — run history     │
+│   • create template (SQL/API/File)       • list all runs         │
+│   • run a report                         • live status (polling) │
+│   • delete template                      • download XLSX         │
 └────────────────────────┬─────────────────────────────────────────┘
-                         │ HTTP (через nginx → /api)
+                         │ HTTP (via nginx → /api)
                          ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                       NestJS API (порт 3000)                     │
+│                       NestJS API (port 3000)                     │
 │                                                                  │
 │   ReportsController         RunsController                       │
 │   • GET  /api/reports        • POST /api/reports/:id/run         │
@@ -23,14 +23,14 @@
 │   • GET  /api/reports/       • GET  /api/runs/:id/download       │
 │         datasources                                               │
 │                                                                  │
-│   RunsService: мёрджит sourceConfig из шаблона в params,        │
-│   кладёт джоб в BullMQ                                           │
+│   RunsService: merges sourceConfig from template into params,    │
+│   enqueues the job in BullMQ                                     │
 └───────────────┬───────────────────────────────────────────────────┘
                 │ enqueue job
                 ▼
 ┌───────────────────────┐
 │    Redis (BullMQ)     │
-│    очередь runs       │
+│    runs queue         │
 └───────────┬───────────┘
             │ dequeue
             ▼
@@ -57,56 +57,56 @@
                ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  XlsxRenderer → StorageService → uploads/ (Docker named volume) │
-│  путь сохраняется в ReportRun.resultPath                         │
+│  path stored in ReportRun.resultPath                             │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-### Границы ответственности
+### Responsibility boundaries
 
-| Компонент           | Ответственность                                                   | Что НЕ делает                   |
-| ------------------- | ----------------------------------------------------------------- | ------------------------------- |
-| `ReportsController` | CRUD шаблонов, health check                                       | Не знает про очередь            |
-| `RunsController`    | Принять запрос на запуск, download                                | Не знает как генерируется отчёт |
-| `RunsService`       | Смёрджить `sourceConfig` из шаблона в params, поставить в очередь | Не обрабатывает джоб            |
-| `RunWorker`         | Lifecycle джоба: статус, вызов процессора, сохранение             | Не знает про HTTP               |
-| `DynamicProcessor`  | Получить данные из источника, вернуть `ReportData`                | Не генерирует файл              |
-| `XlsxRenderer`      | `ReportData` → XLSX-буфер                                         | Не сохраняет на диск            |
-| `StorageService`    | Сохранить буфер, вернуть путь                                     | Не знает про формат файла       |
+| Component           | Responsibility                                                        | Does NOT                       |
+| ------------------- | --------------------------------------------------------------------- | ------------------------------ |
+| `ReportsController` | Template CRUD, health check                                           | Know about the queue           |
+| `RunsController`    | Accept run requests, handle download                                  | Know how reports are generated |
+| `RunsService`       | Merge `sourceConfig` from template into params, enqueue job           | Process the job                |
+| `RunWorker`         | Job lifecycle: status updates, processor call, file save              | Know about HTTP                |
+| `DynamicProcessor`  | Fetch data from source, return `ReportData`                           | Generate files                 |
+| `XlsxRenderer`      | `ReportData` → XLSX buffer                                            | Save to disk                   |
+| `StorageService`    | Save buffer, return path                                              | Know about file format         |
 
 ---
 
-## 2. Как добавить новый отчёт
+## 2. Adding a new report
 
-### Сценарий A — новый шаблон без изменений кода (SQL/API/File)
+### Scenario A — new template without code changes (SQL/API/File)
 
-Всё делается через UI за 2 минуты:
+Done entirely via UI in 2 minutes:
 
-1. Открыть `http://localhost` → **Новый шаблон**
-2. Ввести название и описание
-3. Выбрать тип источника:
-   - **SQL / ClickHouse** — ввести SQL-запрос или оставить пустым (использует `defaultQuery` из конфига датасорса)
-   - **SQL / PostgreSQL** — аналогично
-   - **API** — указать URL внешнего HTTP GET endpoint
-   - **File** — шаблон принимает CSV или XLSX-файл при каждом запуске
-4. Сохранить. `paramsSchema` генерируется автоматически — форма запуска появляется сама.
+1. Open `http://localhost` → **New Template**
+2. Enter name and description
+3. Choose source type:
+   - **SQL / ClickHouse** — enter a SQL query or leave blank (uses `defaultQuery` from datasource config)
+   - **SQL / PostgreSQL** — same
+   - **API** — provide URL of an external HTTP GET endpoint
+   - **File** — template accepts a CSV or XLSX file on each run
+4. Save. `paramsSchema` is generated automatically — the run form appears on its own.
 
-Фильтрация по дате (`dateFrom`/`dateTo`) включается автоматически если в конфиге датасорса указан `dateField`.
+Date filtering (`dateFrom`/`dateTo`) is enabled automatically if `dateField` is set in the datasource config.
 
-### Сценарий B — новый тип источника (изменение кода)
+### Scenario B — new source type (code change)
 
-Если SQL/API/File не подходит (например, нужен gRPC, S3, Kafka-топик):
+If SQL/API/File doesn't fit (e.g. gRPC, S3, Kafka topic):
 
-**Шаг 1.** Добавить вариант в `SourceConfig` (`backend/src/runs/run.types.ts`):
+**Step 1.** Add a variant to `SourceConfig` (`backend/src/runs/run.types.ts`):
 
 ```typescript
 type SourceConfig =
   | { type: "sql"; db: string; query?: string; dateField?: string }
   | { type: "api"; url: string }
   | { type: "file" }
-  | { type: "grpc"; endpoint: string; method: string }; // ← новый
+  | { type: "grpc"; endpoint: string; method: string }; // ← new
 ```
 
-**Шаг 2.** Добавить ветку в `DynamicProcessor.run()`:
+**Step 2.** Add a branch in `DynamicProcessor.run()`:
 
 ```typescript
 if (sourceType === "grpc") {
@@ -114,7 +114,7 @@ if (sourceType === "grpc") {
 }
 ```
 
-**Шаг 3.** Реализовать приватный метод, вернуть `ReportData`:
+**Step 3.** Implement the private method, return `ReportData`:
 
 ```typescript
 private async runGrpc(config: Extract<SourceConfig, { type: 'grpc' }>): Promise<ReportData> {
@@ -123,117 +123,117 @@ private async runGrpc(config: Extract<SourceConfig, { type: 'grpc' }>): Promise<
 }
 ```
 
-**Шаг 4.** Обновить `ReportsService.buildParamsSchema()` если у нового типа есть специфические параметры.
+**Step 4.** Update `ReportsService.buildParamsSchema()` if the new type has specific parameters.
 
-> Очередь, воркер, рендеринг и скачивание файла — без изменений.
-
----
-
-## 3. Принятые решения и альтернативы
-
-### 3.1. DynamicProcessor вместо реестра процессоров
-
-**Проблема:** Как добавлять новые типы отчётов, не трогая пайплайн?
-
-**Рассматривали:**
-
-- **ProcessorRegistry** — словарь `{ [type: string]: ReportProcessor }`, каждый отчёт — отдельный класс с интерфейсом `run(params): Promise<ReportData>`
-- **DynamicProcessor с discriminated union** — один класс, роутинг по `sourceConfig.type`
-
-**Выбрали DynamicProcessor.** При ProcessorRegistry каждый новый шаблон требует нового класса, регистрации в модуле и добавления в реестр — три точки изменений. DynamicProcessor концентрирует всю логику роутинга в одном месте, расширение сводится к добавлению одной ветки `if` и приватного метода.
-
-**Компромисс:** ProcessorRegistry лучше масштабируется при десятках кастомных процессоров со сложной логикой. Для прототипа (3 типа источников) DynamicProcessor — достаточное и более простое решение.
+> Queue, worker, rendering, and file download — unchanged.
 
 ---
 
-### 3.2. BullMQ вместо pg-boss или голого Redis pub/sub
+## 3. Design decisions
 
-**Проблема:** Как надёжно поставить задачу в очередь и не потерять её при сбое?
+### 3.1. DynamicProcessor instead of a processor registry
 
-**Рассматривали:**
+**Problem:** How to support new report types without touching the pipeline?
 
-- **Голый Redis pub/sub** — минимальная зависимость, просто
-- **pg-boss** — очередь поверх PostgreSQL, убирает необходимость в Redis
-- **BullMQ** — production-ready очередь поверх Redis
+**Considered:**
 
-**Выбрали BullMQ.** Голый pub/sub не персистентный: если воркер упал — задача теряется. pg-boss добавляет polling-оверхед на PostgreSQL и медленнее при высокой нагрузке. BullMQ даёт персистентность, автоматические ретраи, delayed jobs, приоритеты — из коробки.
+- **ProcessorRegistry** — a `{ [type: string]: ReportProcessor }` map, each report type as a class implementing `run(params): Promise<ReportData>`
+- **DynamicProcessor with discriminated union** — one class, routing by `sourceConfig.type`
 
-**Компромисс:** Добавляется Redis как инфраструктурная зависимость. Если хотим минимизировать инфраструктуру — pg-boss валидная альтернатива при умеренной нагрузке.
+**Chose DynamicProcessor.** With ProcessorRegistry, each new template requires a new class, a module registration, and a registry entry — three change points. DynamicProcessor centralizes all routing logic in one place; extending it means adding one `if` branch and a private method.
 
----
-
-### 3.3. Поллинг для live-статуса вместо SSE/WebSocket
-
-**Проблема:** Как сообщать фронтенду об изменении статуса запуска в реальном времени?
-
-**Рассматривали:**
-
-- **Polling** — фронтенд опрашивает `GET /api/runs` каждые N секунд
-- **WebSocket** — двунаправленное соединение через `socket.io`
-- **SSE (Server-Sent Events)** — однонаправленный поток сервер → клиент поверх HTTP
-
-**Выбрали polling.** Отчёты в прототипе выполняются за доли секунды — задержка в 1 секунду незаметна. SSE добавлял инфраструктурную сложность: `RunEventsService` (EventEmitter), `Observable`, отдельный эндпоинт — ради сценария, который и так работает мгновенно.
-
-**При выходе в продакшн:** если отчёты займут минуты, переходить на SSE. Бэкенд: `RunEventsService` (Node `EventEmitter`) + NestJS `@Sse()` + `Observable`. Фронтенд: нативный `EventSource`.
+**Trade-off:** ProcessorRegistry scales better with dozens of complex custom processors. For a prototype (3 source types) DynamicProcessor is simpler and sufficient.
 
 ---
 
-### 3.4. ClickHouse для аналитических данных
+### 3.2. BullMQ instead of pg-boss or raw Redis pub/sub
 
-**Проблема:** Отчёты по осмотрам — агрегации по сотням миллионов строк. PostgreSQL справится?
+**Problem:** How to reliably enqueue jobs without losing them on failure?
 
-**Рассматривали:**
+**Considered:**
 
-- **PostgreSQL** с партиционированием по дате
-- **TimescaleDB** — расширение PostgreSQL для time-series
-- **ClickHouse** — колоночная OLAP-база
+- **Raw Redis pub/sub** — minimal dependency, simple
+- **pg-boss** — queue on top of PostgreSQL, eliminates Redis
+- **BullMQ** — production-ready queue on top of Redis
 
-**Выбрали ClickHouse.** PostgreSQL с `COUNT + GROUP BY` по 365M строкам — минуты запроса даже с индексами, потому что строчная СУБД читает все поля каждой строки. ClickHouse читает только нужные колонки благодаря колоночному хранению и векторному выполнению — тот же запрос за миллисекунды. TimescaleDB — хороший компромисс (остаёмся в экосистеме PostgreSQL), но при 100M+ строк отстаёт.
+**Chose BullMQ.** Raw pub/sub is not persistent: if the worker crashes, the job is lost. pg-boss adds polling overhead on PostgreSQL and is slower under high load. BullMQ provides persistence, automatic retries, delayed jobs, and priorities out of the box.
 
----
-
-### 3.5. Ожидание ответа сервера вместо оптимистичного апдейта
-
-**Проблема:** Обновлять UI сразу или ждать подтверждения сервера?
-
-**Рассматривали:** оптимистичный апдейт двумя способами — `useOptimistic` (React 19, с автооткатом) или ручной `setQueryData` (обновить кэш до ответа).
-
-**Выбрали ожидание.** Удаление предваряется диалогом — задержка в 100ms незаметна. Запуск отчёта вернуть нельзя оптимистично: `ReportRun.id` известен только после ответа сервера.
-
-**Компромисс:** для удаления оптимистичный апдейт был бы уместен. При необходимости предпочтём `setQueryData` — проект уже использует React Query, логика отката остаётся в одном месте.
+**Trade-off:** Redis becomes an infrastructure dependency. If minimizing infrastructure is a priority, pg-boss is a valid alternative at moderate load.
 
 ---
 
-### 3.6. Nginx как обратный прокси
+### 3.3. Polling for live status instead of SSE/WebSocket
 
-**Проблема:** В dev CORS нужен (разные порты), в продакшне нежелателен.
+**Problem:** How to notify the frontend about run status changes in real time?
 
-**Рассматривали:**
+**Considered:**
 
-- Оставить CORS открытым и в продакшне
+- **Polling** — frontend calls `GET /api/runs` every N seconds
+- **WebSocket** — bidirectional connection via `socket.io`
+- **SSE (Server-Sent Events)** — one-way server-to-client stream over HTTP
+
+**Chose polling.** Reports in the prototype complete in fractions of a second — a 1-second delay is imperceptible. SSE added infrastructure complexity (`RunEventsService`, `Observable`, a dedicated endpoint) for a scenario that already feels instant.
+
+**When to switch:** if reports take minutes, move to SSE. Backend: `RunEventsService` (Node `EventEmitter`) + NestJS `@Sse()` + `Observable`. Frontend: native `EventSource`.
+
+---
+
+### 3.4. ClickHouse for analytical data
+
+**Problem:** Exam event reports aggregate hundreds of millions of rows. Can PostgreSQL handle it?
+
+**Considered:**
+
+- **PostgreSQL** with date-range partitioning
+- **TimescaleDB** — PostgreSQL extension for time-series
+- **ClickHouse** — columnar OLAP database
+
+**Chose ClickHouse.** PostgreSQL `COUNT + GROUP BY` over 365M rows takes minutes even with indexes, because row-oriented storage reads all columns of every row. ClickHouse reads only the needed columns via columnar storage and vectorized execution — the same query runs in milliseconds. TimescaleDB is a good compromise (stays in the PostgreSQL ecosystem) but falls behind at 100M+ rows.
+
+---
+
+### 3.5. Wait for server response instead of optimistic updates
+
+**Problem:** Update UI immediately or wait for server confirmation?
+
+**Considered:** optimistic updates via `useOptimistic` (React 19, with auto-rollback) or manual `setQueryData` (update cache before response).
+
+**Chose waiting.** Deletion is gated behind a confirmation dialog — a 100ms delay is unnoticeable. Run creation cannot be done optimistically: `ReportRun.id` is only known after the server responds.
+
+**Trade-off:** for deletion, an optimistic update would be appropriate. If needed, `setQueryData` is preferred — the project already uses React Query, and rollback logic stays in one place.
+
+---
+
+### 3.6. Nginx as reverse proxy
+
+**Problem:** CORS is needed in dev (different ports) but not in production.
+
+**Considered:**
+
+- Keep CORS open in production as well
 - Nginx reverse proxy
 
-**Выбрали nginx.** В Docker Compose фронтенд собирается с `VITE_API_URL=/api` — все запросы идут на тот же хост, nginx маршрутизирует `/api/*` на `backend:3000`. CORS в продакшне отсутствует, браузер не видит cross-origin. Бонус: nginx отдаёт статику фронтенда напрямую, не нагружая NestJS.
+**Chose nginx.** In Docker Compose the frontend is built with `VITE_API_URL=/api` — all requests go to the same host, nginx routes `/api/*` to `backend:3000`. No CORS in production; the browser sees no cross-origin requests. Bonus: nginx serves frontend static files directly without loading NestJS.
 
 ---
 
-## 4. Что не реализовано и почему
+## 4. What's not implemented and why
 
-| Фича                        | Почему не в прототипе                        | Что нужно для продакшна                                                            |
-| --------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Аутентификация**          | Нет пользователей в прототипе                | JWT + refresh tokens; `ReportRun.userId` для изоляции данных                       |
-| **PDF-рендерер**            | Chromium в Docker-образе ~200MB              | `puppeteer` (HTML → PDF) или `pdfkit`; графики через `chart.js` → PNG              |
-| **Файловое хранилище**      | Docker named volume достаточно для прототипа | S3/MinIO; `StorageService` уже абстрагирован — менять только его                   |
-| **Пагинация**               | Данных мало, таблицы компактные              | Курсорная пагинация по `createdAt`; бесконечный скролл на фронтенде                |
-| **Редактирование шаблонов** | Создание + удаление покрывает демо-сценарий  | `PUT /api/reports/:id`; форма редактирования на фронтенде                          |
-| **Расписание запусков**     | Вне скоупа прототипа                         | Cron-выражения в шаблоне; `@nestjs/schedule` или BullMQ delayed jobs               |
-| **Тесты**                   | Ограничение по времени                       | Unit-тесты для `DynamicProcessor`; integration-тесты для lifecycle воркера         |
-| **Метрики и observability** | Нет продакшн-нагрузки                        | Prometheus: глубина очереди, время выполнения джоба, error rate; Grafana dashboard |
+| Feature                     | Why not in prototype                          | What production needs                                                                |
+| --------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Authentication**          | No users in the prototype                     | JWT + refresh tokens; `ReportRun.userId` for data isolation                          |
+| **PDF renderer**            | Chromium in Docker image is ~200MB            | `puppeteer` (HTML → PDF) or `pdfkit`; charts via `chart.js` → PNG                   |
+| **File storage**            | Docker named volume is enough for prototype   | S3/MinIO; `StorageService` is already abstracted — only it needs to change           |
+| **Pagination**              | Small data set, compact tables                | Cursor-based pagination by `createdAt`; infinite scroll on frontend                  |
+| **Template editing**        | Create + delete covers the demo scenario      | `PUT /api/reports/:id`; edit form on frontend                                        |
+| **Scheduled runs**          | Out of scope for prototype                    | Cron expressions in template; `@nestjs/schedule` or BullMQ delayed jobs              |
+| **Tests**                   | Time constraints                              | Unit tests for `DynamicProcessor`; integration tests for worker lifecycle            |
+| **Metrics and observability** | No production load                          | Prometheus: queue depth, job execution time, error rate; Grafana dashboard           |
 
-### Что добавить в первую очередь при выходе в продакшн
+### First priorities when going to production
 
-1. **Аутентификация** — все данные платформы завязаны на пользователя
-2. **S3 для файлов** — локальная ФС не масштабируется горизонтально; `StorageService` специально абстрагирован под эту замену
-3. **Тесты на `DynamicProcessor`** — это единственная точка, где живёт бизнес-логика
-4. **SSE вместо поллинга** — когда отчёты начнут занимать минуты
-5. **Мониторинг очереди** — Bull Board уже поддерживается BullMQ, нужно только подключить
+1. **Authentication** — all platform data is tied to a user
+2. **S3 for files** — local filesystem doesn't scale horizontally; `StorageService` is intentionally abstracted for this
+3. **Tests for `DynamicProcessor`** — this is the single point where all business logic lives
+4. **SSE instead of polling** — when reports start taking minutes
+5. **Queue monitoring** — Bull Board is supported by BullMQ out of the box, just needs to be wired up
